@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.stats import norm
-from scipy.stats import truncnorm 
-import h5py 
+from scipy.stats import truncnorm
+import h5py
+import os
 
 ## constant
 mearth2mjup = 317.828
@@ -16,16 +17,19 @@ mupper = 3e5
 ## number of category
 n_pop = 4
 
-## read parameter file
-hyper_file = 'fitting_parameters.h5'
-h5 = h5py.File(hyper_file, 'r')
-all_hyper = h5['hyper_posterior'][:]
-h5.close()
-
 ## function
-from func import piece_linear, ProbRGivenM, classification
+from forecaster.func import piece_linear, ProbRGivenM, classification
 
 ##############################################
+
+def get_fitting_parameters():
+    ## read parameter file
+    hyper_file = os.path.join(os.getcwd(), "forecaster", "fitting_parameters.h5")
+    h5 = h5py.File(hyper_file, 'r')
+    all_hyper = h5['hyper_posterior'][:]
+    h5.close()
+
+    return all_hyper
 
 def Mpost2R(mass, unit='Earth', classify='No'):
 	"""
@@ -36,10 +40,10 @@ def Mpost2R(mass, unit='Earth', classify='No'):
 	mass: one dimensional array
 		The mass distribution.
 	unit: string (optional)
-		Unit of the mass. 
+		Unit of the mass.
 		Options are 'Earth' and 'Jupiter'. Default is 'Earth'.
 	classify: string (optional)
-		If you want the object to be classifed. 
+		If you want the object to be classifed.
 		Options are 'Yes' and 'No'. Default is 'No'.
 		Result will be printed, not returned.
 
@@ -59,11 +63,11 @@ def Mpost2R(mass, unit='Earth', classify='No'):
 	elif unit == 'Jupiter':
 		mass = mass * mearth2mjup
 	else:
-		print "Input unit must be 'Earth' or 'Jupiter'. Using 'Earth' as default."
+		print("Input unit must be 'Earth' or 'Jupiter'. Using 'Earth' as default.")
 
 	# mass range
 	if np.min(mass) < 3e-4 or np.max(mass) > 3e5:
-		print 'Mass range out of model expectation. Returning None.'
+		print('Mass range out of model expectation. Returning None.')
 		return None
 
 	## convert to radius
@@ -72,12 +76,15 @@ def Mpost2R(mass, unit='Earth', classify='No'):
 	prob = np.random.random(sample_size)
 	logr = np.ones_like(logm)
 
-	hyper_ind = np.random.randint(low = 0, high = np.shape(all_hyper)[0], size = sample_size)	
+	all_hyper = get_fitting_parameters()
+
+	hyper_ind = np.random.randint(low = 0, high = np.shape(all_hyper)[0], size = sample_size)
 	hyper = all_hyper[hyper_ind,:]
 
 	if classify == 'Yes':
-		classification(logm, hyper[:,-3:])
-		
+		classes_prob = classification(logm, hyper[:,-3:])
+	else:
+		classes_prob = 0
 
 	for i in range(sample_size):
 		logr[i] = piece_linear(hyper[i], logm[i], prob[i])
@@ -88,13 +95,13 @@ def Mpost2R(mass, unit='Earth', classify='No'):
 	if unit == 'Jupiter':
 		radius = radius_sample / rearth2rjup
 	else:
-		radius = radius_sample 
+		radius = radius_sample
 
-	return radius
+	return radius, classes_prob
 
 
 
-def Mstat2R(mean, std, unit='Earth', sample_size=1000, classify = 'No'):	
+def Mstat2R(mean, std, unit='Earth', sample_size=1000, classify = 'No'):
 	"""
 	Forecast the mean and standard deviation of radius given the mena and standard deviation of the mass.
 	Assuming normal distribution with the mean and standard deviation truncated at the mass range limit of the model.
@@ -124,14 +131,14 @@ def Mstat2R(mean, std, unit='Earth', sample_size=1000, classify = 'No'):
 		mean = mean * mearth2mjup
 		std = std * mearth2mjup
 	else:
-		print "Input unit must be 'Earth' or 'Jupiter'. Using 'Earth' as default."
+		print("Input unit must be 'Earth' or 'Jupiter'. Using 'Earth' as default.")
 
 	# draw samples
-	mass = truncnorm.rvs( (mlower-mean)/std, (mupper-mean)/std, loc=mean, scale=std, size=sample_size)	
-	if classify == 'Yes':	
-		radius = Mpost2R(mass, unit='Earth', classify='Yes')
+	mass = truncnorm.rvs( (mlower-mean)/std, (mupper-mean)/std, loc=mean, scale=std, size=sample_size)
+	if classify == 'Yes':
+		radius, classes_prob = Mpost2R(mass, unit='Earth', classify='Yes')
 	else:
-		radius = Mpost2R(mass, unit='Earth')
+		radius, classes_prob = Mpost2R(mass, unit='Earth')
 
 	if unit == 'Jupiter':
 		radius = radius / rearth2rjup
@@ -141,7 +148,7 @@ def Mstat2R(mean, std, unit='Earth', sample_size=1000, classify = 'No'):
 	r_up = np.percentile(radius, 50.+onesigma, interpolation='nearest')
 	r_down = np.percentile(radius, 50.-onesigma, interpolation='nearest')
 
-	return r_med, r_up - r_med, r_med - r_down
+	return r_med, r_up - r_med, r_med - r_down, classes_prob
 
 
 
@@ -159,7 +166,7 @@ def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No'):
 		Number of grid in the mass axis when sampling mass from radius.
 		The more the better results, but slower process.
 	classify: string (optional)
-		If you want the object to be classifed. 
+		If you want the object to be classifed.
 		Options are 'Yes' and 'No'. Default is 'No'.
 		Result will be printed, not returned.
 
@@ -168,26 +175,26 @@ def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No'):
 	mass: one dimensional array
 		Predicted mass distribution in the input unit.
 	"""
-	
+
 	# unit
 	if unit == 'Earth':
 		pass
 	elif unit == 'Jupiter':
 		radius = radius * rearth2rjup
 	else:
-		print "Input unit must be 'Earth' or 'Jupiter'. Using 'Earth' as default."
+		print("Input unit must be 'Earth' or 'Jupiter'. Using 'Earth' as default.")
 
 
 	# radius range
 	if np.min(radius) < 1e-1 or np.max(radius) > 1e2:
-		print 'Radius range out of model expectation. Returning None.'
+		print('Radius range out of model expectation. Returning None.')
 		return None
 
 
 
 	# sample_grid
 	if grid_size < 10:
-		print 'The sample grid is too sparse. Using 10 sample grid instead.'
+		print('The sample grid is too sparse. Using 10 sample grid instead.')
 		grid_size = 10
 
 	## convert to mass
@@ -195,7 +202,9 @@ def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No'):
 	logr = np.log10(radius)
 	logm = np.ones_like(logr)
 
-	hyper_ind = np.random.randint(low = 0, high = np.shape(all_hyper)[0], size = sample_size)	
+	all_hyper = get_fitting_parameters()
+
+	hyper_ind = np.random.randint(low = 0, high = np.shape(all_hyper)[0], size = sample_size)
 	hyper = all_hyper[hyper_ind,:]
 
 	logm_grid = np.linspace(-3.522, 5.477, grid_size)
@@ -203,23 +212,23 @@ def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No'):
 	for i in range(sample_size):
 		prob = ProbRGivenM(logr[i], logm_grid, hyper[i,:])
 		logm[i] = np.random.choice(logm_grid, size=1, p = prob)
-
+        
 	mass_sample = 10.** logm
 
 	if classify == 'Yes':
-		classification(logm, hyper[:,-3:])
-
+		classes_prob = classification(logm, hyper[:,-3:])
+	else:
+		classes_prob = 0
+        
 	## convert to right unit
 	if unit == 'Jupiter':
 		mass = mass_sample / mearth2mjup
 	else:
 		mass = mass_sample
-	
-	return mass
 
+	return mass, classes_prob
 
-
-def Rstat2M(mean, std, unit='Earth', sample_size=1e3, grid_size=1e3, classify = 'No'):	
+def Rstat2M(mean, std, unit='Earth', sample_size=1e3, grid_size=1e3, classify = 'No'):
 	"""
 	Forecast the mean and standard deviation of mass given the mean and standard deviation of the radius.
 
@@ -250,14 +259,14 @@ def Rstat2M(mean, std, unit='Earth', sample_size=1e3, grid_size=1e3, classify = 
 		mean = mean * rearth2rjup
 		std = std * rearth2rjup
 	else:
-		print "Input unit must be 'Earth' or 'Jupiter'. Using 'Earth' as default."
+		print("Input unit must be 'Earth' or 'Jupiter'. Using 'Earth' as default.")
 
 	# draw samples
-	radius = truncnorm.rvs( (0.-mean)/std, np.inf, loc=mean, scale=std, size=sample_size)	
+	radius = truncnorm.rvs( (0.-mean)/std, np.inf, loc=mean, scale=std, size=sample_size)
 	if classify == 'Yes':
-		mass = Rpost2M(radius, 'Earth', grid_size, classify='Yes')
+		mass, classes_prob = Rpost2M(radius, 'Earth', grid_size, classify='Yes')
 	else:
-		mass = Rpost2M(radius, 'Earth', grid_size)
+		mass, classes_prob = Rpost2M(radius, 'Earth', grid_size)
 
 	if mass is None:
 		return None
@@ -270,7 +279,4 @@ def Rstat2M(mean, std, unit='Earth', sample_size=1e3, grid_size=1e3, classify = 
 	m_up = np.percentile(mass, 50.+onesigma, interpolation='nearest')
 	m_down = np.percentile(mass, 50.-onesigma, interpolation='nearest')
 
-	return m_med, m_up - m_med, m_med - m_down
-
-
-	
+	return m_med, m_up - m_med, m_med - m_down, classes_prob
