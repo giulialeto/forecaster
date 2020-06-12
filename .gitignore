@@ -1,0 +1,12 @@
+
+.DS_Store
+.gitkeep
+__init__.py
+__pycache__/__init__.cpython-37.pyc
+__pycache__/__init__.cpython-38.pyc
+__pycache__/fitting_parameters.cpython-37.pyc
+__pycache__/forecaster.cpython-37.pyc
+__pycache__/func.cpython-37.pyc
+__pycache__/func.cpython-38.pyc
+__pycache__/mr_forecast.cpython-37.pyc
+__pycache__/mr_forecast.cpython-38.pyc

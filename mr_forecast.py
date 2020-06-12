@@ -19,12 +19,12 @@ n_pop = 4
 
 ## function
 from forecaster.func import piece_linear, ProbRGivenM, classification
-
 ##############################################
 
 def get_fitting_parameters():
     ## read parameter file
-    hyper_file = os.path.join(os.getcwd(), "forecaster", "fitting_parameters.h5")
+    my_path = os.path.abspath(os.path.dirname(__file__))
+    hyper_file = os.path.join(my_path, "fitting_parameters.h5")
     h5 = h5py.File(hyper_file, 'r')
     all_hyper = h5['hyper_posterior'][:]
     h5.close()
