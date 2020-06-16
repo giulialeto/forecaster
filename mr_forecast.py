@@ -67,8 +67,10 @@ def Mpost2R(mass, unit='Earth', classify='No'):
 
 	# mass range
 	if np.min(mass) < 3e-4 or np.max(mass) > 3e5:
-		print('Mass range out of model expectation. Returning None.')
-		return None
+		# print('Mass range out of model expectation. Returning None.')
+		radius = 0
+		classes= {'Terrestrial': 0, 'Neptunian': 0, 'Jovian': 0, 'Star': 0}
+		return radius, classes
 
 	## convert to radius
 	sample_size = len(mass)
@@ -135,6 +137,7 @@ def Mstat2R(mean, std, unit='Earth', sample_size=1000, classify = 'No'):
 
 	# draw samples
 	mass = truncnorm.rvs( (mlower-mean)/std, (mupper-mean)/std, loc=mean, scale=std, size=sample_size)
+
 	if classify == 'Yes':
 		radius, classes_prob = Mpost2R(mass, unit='Earth', classify='Yes')
 	else:
@@ -187,8 +190,10 @@ def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No'):
 
 	# radius range
 	if np.min(radius) < 1e-1 or np.max(radius) > 1e2:
-		print('Radius range out of model expectation. Returning None.')
-		return None
+		#print('Radius range out of model expectation. Returning None.')
+		mass = 0
+		classes=  {'Terrestrial': 0, 'Neptunian': 0, 'Jovian': 0, 'Star': 0}
+		return mass, classes
 
 
 
